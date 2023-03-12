@@ -197,7 +197,7 @@ class ModelViewerState extends State<ModelViewer> {
       interpolationDecay: widget.interpolationDecay,
       // Lighting & Env Attributes
       skyboxImage: widget.skyboxImage,
-      environmentImage: widget.environmentImage,
+      environmentImage: widget.environmentImage == null ? null : "http://${_proxy!.address.address}:${_proxy!.port}/environment",
       exposure: widget.exposure,
       shadowIntensity: widget.shadowIntensity,
       shadowSoftness: widget.shadowSoftness,
@@ -228,6 +228,7 @@ class ModelViewerState extends State<ModelViewer> {
 
   Future<void> _initProxy() async {
     final url = Uri.parse(widget.src);
+    final environmentUrl = widget.environmentImage == null ? null : Uri.parse(widget.environmentImage!);
     _proxy = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
 
     setState(() {
@@ -281,6 +282,28 @@ class ModelViewerState extends State<ModelViewer> {
               ..headers.add("Content-Type", "application/octet-stream")
               ..headers.add("Content-Length", data.lengthInBytes.toString())
               ..headers.add("Access-Control-Allow-Origin", "*")
+              ..add(data);
+            await response.close();
+          }
+          break;
+
+        case '/environment':
+          if(environmentUrl == null) {
+            response.close();
+            break;
+          }
+          if (environmentUrl.isAbsolute && !environmentUrl.isScheme("file")) {
+            // debugPrint(url.toString());
+            await response.redirect(environmentUrl); // TODO: proxy the resource
+          } else {
+            final data = await (environmentUrl.isScheme("file")
+                ? _readFile(environmentUrl.path)
+                : _readAsset(environmentUrl.path));
+            response
+              ..statusCode = HttpStatus.ok
+              ..headers.add("Content-Type", "application/octet-stream")
+              ..headers.add("Content-Length", data.lengthInBytes.toString())
+            ..headers.add("Access-Control-Allow-Origin", "*")
               ..add(data);
             await response.close();
           }
